@@ -1,0 +1,442 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a0a0f; color: #e0e0e0; overflow: hidden; height: 100vh; }
+
+#header {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #e94560;
+  height: 56px;
+  z-index: 1000;
+  position: relative;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-left h1 { font-size: 18px; color: #e94560; font-weight: 800; letter-spacing: 1px; }
+.subtitle { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; }
+.header-center { display: flex; gap: 20px; font-size: 13px; color: #ccc; }
+.header-center span { background: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 4px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+#main { display: flex; height: calc(100vh - 56px); }
+
+#sidebar-left { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px; background: #0d0d14; border-right: 1px solid #1a1a2e; overflow: hidden; }
+#sidebar-right { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px; background: #0d0d14; border-left: 1px solid #1a1a2e; overflow: hidden; }
+
+#mapContainer { flex: 1; position: relative; overflow: hidden; background: #05070a; }
+#map { width: 100%; height: 100%; }
+.war-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 420;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.radar-sweep {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 130vmax;
+  height: 130vmax;
+  transform-origin: 0 0;
+  background: conic-gradient(from 0deg, rgba(69,255,188,0.2), rgba(69,255,188,0.03) 9deg, transparent 23deg);
+  opacity: 0.25;
+  animation: radarSweep 8s linear infinite;
+}
+.scan-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(80,255,210,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80,255,210,0.05) 1px, transparent 1px);
+  background-size: 46px 46px;
+  opacity: 0.22;
+}
+.signal-noise {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 26% 34%, rgba(255,23,68,0.16), transparent 16%),
+    radial-gradient(circle at 72% 60%, rgba(0,229,255,0.12), transparent 14%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 5px);
+  opacity: 0.45;
+  animation: signalFlicker 3.5s steps(3, end) infinite;
+}
+.leaflet-overlay-pane svg path {
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+}
+.tactical-line {
+  stroke-linecap: round;
+  stroke-dasharray: 12 9;
+  filter: drop-shadow(0 0 8px rgba(255,255,255,0.5));
+  animation: tacticalMarch 0.55s linear infinite, tacticalFade 4.8s ease-out forwards;
+}
+.tactical-line-attack {
+  stroke: #ff1744;
+  filter: drop-shadow(0 0 8px rgba(255,23,68,0.95)) drop-shadow(0 0 16px rgba(255,23,68,0.5));
+}
+.tactical-line-movement {
+  stroke: #00e5ff;
+  filter: drop-shadow(0 0 8px rgba(0,229,255,0.95)) drop-shadow(0 0 16px rgba(0,229,255,0.5));
+}
+.tactical-line-airstrike {
+  stroke: #b388ff;
+  stroke-dasharray: 3 9;
+  filter: drop-shadow(0 0 8px rgba(179,136,255,0.95)) drop-shadow(0 0 18px rgba(179,136,255,0.55));
+  animation: tacticalMarch 0.32s linear infinite, tacticalFade 5.6s ease-out forwards;
+}
+.tactical-impact {
+  animation: tacticalImpact 1s ease-out infinite;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+.tactical-tooltip {
+  background: rgba(3,7,18,0.88);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+}
+.tactical-beacon-icon {
+  background: transparent;
+  border: 0;
+}
+.tactical-beacon {
+  min-width: 24px;
+  height: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(3,7,18,0.92);
+  border: 1px solid currentColor;
+  color: #00e5ff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 14px;
+  text-align: center;
+  box-shadow: 0 0 12px currentColor;
+  animation: beaconPulse 0.75s ease-in-out infinite alternate, tacticalFade 4.8s ease-out forwards;
+}
+.tactical-beacon span {
+  margin-left: 3px;
+  font-size: 8px;
+}
+.tactical-beacon-attack {
+  color: #ff1744;
+  animation-duration: 0.45s, 4.8s;
+}
+.tactical-beacon-airstrike {
+  color: #b388ff;
+  animation-duration: 0.35s, 5.6s;
+}
+.hex-region-icon {
+  background: transparent;
+  border: 0;
+}
+.hex-stack {
+  position: relative;
+  width: var(--hex-size);
+  height: var(--hex-size);
+}
+.hex-region {
+  position: absolute;
+  inset: 0;
+  background: rgba(226,232,240,0.92);
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.75)) drop-shadow(0 0 4px color-mix(in srgb, var(--hex-accent) 40%, transparent));
+  opacity: var(--hex-opacity);
+  transition: transform 0.12s ease, opacity 0.12s ease, filter 0.12s ease;
+}
+.hex-region span {
+  position: absolute;
+  inset: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3,7,18,0.9);
+  color: #fff;
+  clip-path: inherit;
+  font-size: max(9px, calc(var(--hex-size) * 0.62));
+  line-height: 1;
+  text-shadow: 0 1px 2px #000;
+}
+.hex-strength {
+  position: absolute;
+  right: -10px;
+  top: -7px;
+  z-index: 2;
+  min-width: 18px;
+  padding: 1px 4px;
+  border: 1px solid rgba(255,255,255,0.55);
+  border-radius: 999px;
+  background: rgba(3,7,18,0.86);
+  color: #f8fafc;
+  font-size: 8px;
+  line-height: 1.1;
+  font-weight: 800;
+  text-align: center;
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}
+.hex-region.hovered {
+  opacity: 1;
+  transform: scale(1.2);
+  filter: drop-shadow(0 0 8px rgba(255,255,255,0.35));
+}
+.hex-region.selected {
+  opacity: 1;
+  transform: scale(1.28);
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.55)) drop-shadow(0 0 12px var(--hex-accent));
+}
+.hex-region.dimmed {
+  opacity: 0.32;
+}
+.conquest-pulse {
+  animation: conquestPulse 1.3s ease-out forwards;
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.5));
+}
+
+@keyframes radarSweep {
+  from { transform: rotate(0deg) translate(-50%, -50%); }
+  to { transform: rotate(360deg) translate(-50%, -50%); }
+}
+@keyframes signalFlicker {
+  0%, 100% { opacity: 0.34; }
+  45% { opacity: 0.52; }
+  60% { opacity: 0.24; }
+}
+@keyframes conquestPulse {
+  from { stroke-width: 2; stroke-opacity: 1; fill-opacity: 0.25; }
+  to { stroke-width: 7; stroke-opacity: 0; fill-opacity: 0; }
+}
+@keyframes tacticalMarch {
+  to { stroke-dashoffset: -20; }
+}
+@keyframes tacticalFade {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  82% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes tacticalImpact {
+  from { stroke-width: 2; stroke-opacity: 1; fill-opacity: 0.4; }
+  to { stroke-width: 7; stroke-opacity: 0; fill-opacity: 0; }
+}
+@keyframes beaconPulse {
+  from { transform: scale(0.92); opacity: 0.72; }
+  to { transform: scale(1.18); opacity: 1; }
+}
+
+.panel { background: #12121e; border: 1px solid #1e1e32; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; flex: 1; }
+.panel-header { background: #1a1a2e; padding: 6px 10px; font-size: 11px; font-weight: 700; color: #e94560; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #1e1e32; display: flex; align-items: center; }
+.panel-body { padding: 4px; overflow-y: auto; flex: 1; font-size: 12px; }
+
+#factionPanel { flex: 2; }
+#eventPanel { flex: 2; }
+#chatPanel { flex: 2; min-height: 100px; }
+#legendPanel { flex: 1; }
+#infoPanel { flex: 2; }
+
+#factionList { display: flex; flex-direction: column; gap: 2px; }
+.faction-item {
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+  border-radius: 4px; cursor: pointer; transition: all 0.2s;
+  border-left: 3px solid transparent;
+}
+.faction-item:hover { background: rgba(255,255,255,0.05); }
+.faction-item.selected { background: rgba(233,69,96,0.15); border-left-color: #e94560; }
+.faction-item .flag { font-size: 16px; }
+.faction-item .name { flex: 1; font-weight: 600; font-size: 11px; }
+.faction-item .power { font-size: 10px; color: #888; }
+.faction-item .doctrine-badge { font-size: 10px; padding: 0 3px; }
+.faction-item.dead { opacity: 0.4; }
+.faction-item.dead .name { text-decoration: line-through; }
+
+.legend-item { display: flex; align-items: center; gap: 6px; padding: 2px 6px; font-size: 10px; }
+.legend-flag { width: 16px; text-align: center; font-size: 13px; }
+
+#eventLog { display: flex; flex-direction: column; gap: 2px; }
+.event-entry {
+  padding: 3px 6px; border-radius: 3px; font-size: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  animation: slideIn 0.25s ease-out, highlightNew 1.5s ease-out;
+}
+.event-entry.battle { background: rgba(233,69,96,0.08); border-left: 2px solid #e94560; }
+.event-entry.alliance { background: rgba(46,204,113,0.08); border-left: 2px solid #2ecc71; }
+.event-entry.emotion { background: rgba(155,89,182,0.08); border-left: 2px solid #9b59b6; }
+.event-entry.random_event { background: rgba(241,196,15,0.08); border-left: 2px solid #f1c40f; }
+.event-entry.war_declaration { background: rgba(231,76,60,0.12); border-left: 2px solid #e74c3c; }
+.event-entry.betrayal { background: rgba(231,76,60,0.15); border-left: 2px solid #c0392b; }
+.event-entry.faction_destroyed, .event-entry.faction_surrendered, .event-entry.faction_wiped {
+  background: rgba(142,68,173,0.15); border-left: 2px solid #8e44ad; font-weight: bold;
+}
+.event-entry.game_start { background: rgba(46,204,113,0.1); border-left: 2px solid #2ecc71; }
+.event-entry.diplomatic_incident { background: rgba(230,126,34,0.08); border-left: 2px solid #e67e22; }
+.event-entry.economic_rivalry { background: rgba(241,196,15,0.06); border-left: 2px solid #f1c40f; }
+.event-entry.emotion { background: rgba(155,89,182,0.08); border-left: 2px solid #9b59b6; }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); max-height: 0; }
+  to { opacity: 1; transform: translateY(0); max-height: 50px; }
+}
+@keyframes highlightNew {
+  0% { background-color: rgba(233,69,96,0.15); }
+  100% { background-color: transparent; }
+}
+
+.btn {
+  padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: 700;
+  font-size: 12px; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-green { background: #2ecc71; color: #fff; }
+.btn-green:hover:not(:disabled) { background: #27ae60; }
+.btn-yellow { background: #f39c12; color: #fff; }
+.btn-yellow:hover:not(:disabled) { background: #e67e22; }
+
+.status-badge { font-size: 11px; font-weight: bold; color: #4ade80; padding: 2px 8px; border: 1px solid #4ade80; border-radius: 4px; letter-spacing: 1px; }
+
+.info-placeholder { padding: 10px; text-align: center; color: #666; font-size: 11px; }
+
+#selectedInfo { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 6px; font-size: 11px; color: #ccc; display: none; }
+
+#notification {
+  position: fixed; top: 65px; left: 50%; transform: translateX(-50%);
+  padding: 10px 24px; border-radius: 8px; font-weight: 700; font-size: 14px;
+  z-index: 9999; transition: all 0.5s; text-align: center; max-width: 600px;
+}
+#notification.hidden { opacity: 0; transform: translateX(-50%) translateY(-20px); pointer-events: none; }
+#notification.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#notification.war { background: rgba(231,76,60,0.9); color: #fff; }
+#notification.alliance { background: rgba(46,204,113,0.9); color: #fff; }
+#notification.betrayal { background: rgba(142,68,173,0.9); color: #fff; }
+#notification.destroy { background: rgba(0,0,0,0.9); color: #e94560; border: 2px solid #e94560; }
+
+/* Notification Bell */
+.notification-bell {
+  position: relative; cursor: pointer; font-size: 20px;
+  padding: 4px 8px; border-radius: 4px; transition: background 0.2s;
+}
+.notification-bell:hover { background: rgba(255,255,255,0.1); }
+.notif-badge {
+  position: absolute; top: -2px; right: 2px; background: #e94560;
+  color: #fff; font-size: 9px; font-weight: 700; padding: 1px 5px;
+  border-radius: 10px; min-width: 16px; text-align: center;
+}
+
+/* Doctrine Selector */
+.doctrine-selector { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.doctrine-selector select {
+  background: #1a1a2e; color: #ccc; border: 1px solid #333; border-radius: 4px;
+  padding: 3px 6px; font-size: 11px; cursor: pointer;
+}
+
+/* Doctrine Badge Colors */
+.doctrine-european { color: #2d6abf; }
+.doctrine-western { color: #bf2d2d; }
+.doctrine-eastern { color: #6b2dbf; }
+
+/* Slide Panel (Notifications) */
+.slide-panel {
+  position: fixed; top: 56px; right: 0; width: 350px; height: calc(100vh - 56px);
+  background: #12121e; border-left: 2px solid #1e1e32; z-index: 5000;
+  display: flex; flex-direction: column; transition: transform 0.3s ease;
+  box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+}
+.slide-panel.hidden { transform: translateX(100%); }
+.slide-panel-header {
+  background: #1a1a2e; padding: 10px 14px; font-size: 13px; font-weight: 700;
+  color: #e94560; text-transform: uppercase; letter-spacing: 1px;
+  border-bottom: 1px solid #1e1e32; display: flex; justify-content: space-between; align-items: center;
+}
+.slide-close { cursor: pointer; font-size: 16px; color: #888; }
+.slide-close:hover { color: #e94560; }
+.slide-panel-body { flex: 1; overflow-y: auto; padding: 6px; }
+
+/* Chat styles */
+#chatLog { display: flex; flex-direction: column; gap: 2px; }
+.chat-entry {
+  padding: 3px 6px; border-radius: 3px; font-size: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  animation: slideIn 0.25s ease-out, highlightNew 1.5s ease-out;
+}
+.chat-sender { font-weight: 700; }
+.chat-emotion { font-size: 9px; }
+.chat-type-war_declaration .chat-emotion { color: #e74c3c; }
+.chat-type-alliance_offer .chat-emotion { color: #2ecc71; }
+.chat-type-betrayal .chat-emotion { color: #c0392b; }
+.chat-type-victory_gloat .chat-emotion { color: #f1c40f; }
+.chat-type-threat .chat-emotion { color: #e67e22; }
+.chat-type-desperate_plea .chat-emotion { color: #3498db; }
+.chat-type-fear .chat-emotion { color: #9b59b6; }
+.chat-type-insult .chat-emotion { color: #e74c3c; }
+.chat-type-praise .chat-emotion { color: #2ecc71; }
+.chat-type-greetings .chat-emotion { color: #888; }
+.chat-type-chat .chat-emotion { color: #888; }
+
+/* Doctrine info in info panel */
+.doctrine-info {
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+  margin: 4px 0; border-radius: 4px; font-size: 10px;
+}
+.doctrine-info.western { background: rgba(191,45,45,0.12); border-left: 3px solid #bf2d2d; }
+.doctrine-info.european { background: rgba(45,106,191,0.12); border-left: 3px solid #2d6abf; }
+.doctrine-info.eastern { background: rgba(107,45,191,0.12); border-left: 3px solid #6b2dbf; }
+
+.specialty { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 9px; margin: 1px 2px; background: rgba(255,255,255,0.06); color: #aaa; }
+.weakness { font-size: 9px; color: #e74c3c; font-style: italic; margin-top: 2px; }
+.tactical-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin: 6px 0;
+}
+.tactical-strip div {
+  border: 1px solid rgba(80,255,210,0.22);
+  background: linear-gradient(180deg, rgba(80,255,210,0.08), rgba(233,69,96,0.06));
+  border-radius: 4px;
+  padding: 4px 5px;
+}
+.tactical-strip span {
+  display: block;
+  color: #64f4d3;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.tactical-strip b {
+  color: #f8fafc;
+  font-size: 12px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+/* Region popup */
+.region-popup { font-size: 11px; }
+.region-popup h3 { font-size: 13px; margin-bottom: 4px; }
+.region-popup .stat { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
+
+/* Relation panel in info */
+.relation-row { display: flex; align-items: center; gap: 4px; padding: 2px 4px; font-size: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.relation-flag { font-size: 14px; }
+.relation-name { flex: 1; }
+.relation-status { font-size: 9px; padding: 1px 4px; border-radius: 3px; }
+.relation-status.war { background: rgba(231,76,60,0.3); color: #e74c3c; }
+.relation-status.alliance { background: rgba(46,204,113,0.3); color: #2ecc71; }
+.relation-status.neutral { background: rgba(255,255,255,0.1); color: #999; }
+.relation-emotion { font-size: 9px; padding: 1px 4px; border-radius: 3px; }
+
+.emotion-hatred { color: #e74c3c; font-weight: bold; }
+.emotion-anger { color: #e67e22; font-weight: bold; }
+.emotion-love { color: #e91e63; font-weight: bold; }
+.emotion-joy { color: #2ecc71; }
+.emotion-sadness { color: #3498db; }
+.emotion-fear { color: #9b59b6; }
+.emotion-disgust { color: #1abc9c; }
+.emotion-pride { color: #f1c40f; }
+.emotion-shame { color: #95a5a6; }
+.emotion-neutral { color: #888; }

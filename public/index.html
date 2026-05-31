@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Europa AI Wars</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <div id="header">
+    <div class="header-left">
+      <h1>🌍 EUROPA AI WARS</h1>
+      <span class="subtitle">World War 3 - AI Conquest</span>
+    </div>
+    <div class="header-center">
+      <span id="turnCounter">Turn: 0</span>
+      <span id="factionCount">Factions: 0</span>
+    </div>
+    <div class="header-right">
+      <div class="notification-bell" id="notificationBell" onclick="toggleNotificationPanel()">
+        🔔<span class="notif-badge" id="notifBadge">0</span>
+      </div>
+      <div class="doctrine-selector" id="doctrineSelector">
+        <span>📚</span>
+        <select id="doctrineFilter" onchange="filterByDoctrine(this.value)">
+          <option value="all">All Doctrines</option>
+          <option value="western">⚡ Western</option>
+          <option value="european">🛡️ European</option>
+          <option value="eastern">🏗️ Eastern</option>
+        </select>
+      </div>
+      <span id="statusBadge" class="status-badge">▶ LIVE</span>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="sidebar-left">
+      <div class="panel" id="factionPanel">
+        <div class="panel-header">⚔️ FACTIONS</div>
+        <div class="panel-body" id="factionList"></div>
+      </div>
+      <div class="panel" id="legendPanel">
+        <div class="panel-header">📊 LEGEND</div>
+        <div class="panel-body" id="legendList"></div>
+      </div>
+    </div>
+
+    <div id="mapContainer">
+      <div id="map"></div>
+      <div id="mapOverlay">
+        <div id="selectedInfo"></div>
+      </div>
+    </div>
+
+    <div id="sidebar-right">
+      <div class="panel" id="eventPanel">
+        <div class="panel-header">📜 EVENT LOG</div>
+        <div class="panel-body" id="eventLog"></div>
+      </div>
+      <div class="panel" id="chatPanel">
+        <div class="panel-header">
+          💬 AI CHAT
+          <span style="font-size:9px;color:#666;margin-left:auto;">Live faction messages</span>
+        </div>
+        <div class="panel-body" id="chatLog"></div>
+      </div>
+      <div class="panel" id="infoPanel">
+        <div class="panel-header">ℹ️ SELECTED</div>
+        <div class="panel-body" id="infoContent">
+          <div class="info-placeholder">Click a region or faction for details</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notification" class="hidden"></div>
+
+  <div id="notificationPanel" class="slide-panel hidden">
+    <div class="slide-panel-header">
+      🔔 NOTIFICATIONS
+      <span class="slide-close" onclick="toggleNotificationPanel()">✕</span>
+    </div>
+    <div class="slide-panel-body" id="notificationList"></div>
+  </div>
+
+  <script src="/js/map.js"></script>
+  <script src="/js/ui.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
