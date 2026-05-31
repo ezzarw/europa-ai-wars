@@ -24,7 +24,7 @@ class GameController {
     this.marketPrices = { food: 1.0, oil: 1.0, minerals: 1.0, tech: 1.0 };
   }
 
-  registerAgent(name, type = 'builtin') {
+  registerAgent(name, type = 'builtin', factionId = null) {
     const aliveFactions = Object.values(this.engine.factions).filter(f => f.alive);
     const takenIds = new Set(Object.values(this.agents).map(a => a.factionId));
 
@@ -33,16 +33,26 @@ class GameController {
       f.regions = this.engine.regions.filter(r => r.owner === f.id).map(r => r.id);
     }
 
+    const assignFaction = (faction) => {
+      const agentId = `agent_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      this.agents[agentId] = { agentId, name, factionId: faction.id, type, connected: true, joinedAt: Date.now() };
+      faction.relations._agentId = agentId;
+      this.engine.notifications.addNotification(faction.id, 'system', `🤖 AI Agent "${name}" has taken control of ${faction.name}!`);
+      this.engine.eventLog.push({ type: 'agent_join', message: `🤖 AI Agent "${name}" joins as ${faction.flag} ${faction.name}!` });
+      return { agentId, faction: faction.id, factionName: faction.name, type: 'existing' };
+    };
+
+    if (factionId) {
+      const target = aliveFactions.find(f => f.id === factionId);
+      if (!target) return { error: `Faction "${factionId}" not found or is dead.` };
+      if (takenIds.has(target.id)) return { error: `Faction "${factionId}" is already taken by another agent.` };
+      if (target.regions.length === 0) return { error: `Faction "${factionId}" has no regions left.` };
+      return assignFaction(target);
+    }
+
     const free = aliveFactions.find(f => !takenIds.has(f.id) && f.regions.length > 0);
 
-    if (free) {
-      const agentId = `agent_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-      this.agents[agentId] = { agentId, name, factionId: free.id, type, connected: true, joinedAt: Date.now() };
-      free.relations._agentId = agentId;
-      this.engine.notifications.addNotification(free.id, 'system', `🤖 AI Agent "${name}" has taken control of ${free.name}!`);
-      this.engine.eventLog.push({ type: 'agent_join', message: `🤖 AI Agent "${name}" joins as ${free.flag} ${free.name}!` });
-      return { agentId, faction: free.id, factionName: free.name, type: 'existing' };
-    }
+    if (free) return assignFaction(free);
 
     return this.createRebelFaction(name, type);
   }

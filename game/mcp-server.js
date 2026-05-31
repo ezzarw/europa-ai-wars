@@ -477,12 +477,21 @@ const TOOL_DEFINITIONS = {
       },
     },
     {
+      name: 'get_available_factions',
+      description: 'List all factions available to join — alive, not taken by any agent, and has territory.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
+    {
       name: 'register_agent',
-      description: 'Register yourself as an AI agent controlling a faction. Returns your agentId to use with all other tools.',
+      description: 'Register yourself as an AI agent controlling a faction. Optionally pick a faction from get_available_factions, or leave blank for auto-assign. Returns your agentId to use with all other tools.',
       inputSchema: {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Your agent name (e.g. "MyAI")' },
+          factionId: { type: 'string', description: '(Optional) Faction ID to take over. Leave blank for auto-assign.' },
         },
         required: ['name'],
       },
@@ -509,8 +518,13 @@ function handleMcpRequest(request, gameController) {
       const { name, arguments: args } = params;
       const agentId = params._agentId || 'builtin';
 
+      if (name === 'get_available_factions') {
+        const factions = gameController.getJoinableFactions();
+        return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(factions, null, 2) }] } };
+      }
+
       if (name === 'register_agent') {
-        const result = gameController.registerAgent(args?.name || 'MCP Agent');
+        const result = gameController.registerAgent(args?.name || 'MCP Agent', 'external', args?.factionId || null);
         return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] } };
       }
 
