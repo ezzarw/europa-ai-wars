@@ -260,7 +260,6 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .event-entry {
   padding: 3px 6px; border-radius: 3px; font-size: 10px;
   border-bottom: 1px solid rgba(255,255,255,0.03);
-  animation: slideIn 0.25s ease-out, highlightNew 1.5s ease-out;
 }
 .event-entry.battle { background: rgba(233,69,96,0.08); border-left: 2px solid #e94560; }
 .event-entry.alliance { background: rgba(46,204,113,0.08); border-left: 2px solid #2ecc71; }
@@ -359,7 +358,6 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .chat-entry {
   padding: 3px 6px; border-radius: 3px; font-size: 10px;
   border-bottom: 1px solid rgba(255,255,255,0.03);
-  animation: slideIn 0.25s ease-out, highlightNew 1.5s ease-out;
 }
 .chat-sender { font-weight: 700; }
 .chat-emotion { font-size: 9px; }

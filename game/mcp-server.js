@@ -161,6 +161,29 @@ const TOOL_DEFINITIONS = {
         required: ['regionId'],
       },
     },
+    {
+      name: 'deploy_troops',
+      description: 'Deploy troops from multiple regions to one or more target regions. Troops move automatically per turn through friendly/allied territory. Requires owned or allied-with-access path.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          fromRegions: { type: 'array', items: { type: 'string' }, description: 'Source region IDs' },
+          toRegions: { type: 'array', items: { type: 'string' }, description: 'Target region IDs. Troops are split evenly between targets.' },
+          count: { type: 'number', description: 'Total troops to deploy (optional, defaults to all available)' },
+        },
+        required: ['fromRegions', 'toRegions'],
+      },
+    },
+    {
+      name: 'get_movement_orders',
+      description: 'Check pending auto-deploy movement orders for your faction.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          orderId: { type: 'string', description: 'Optional: specific order ID to check' },
+        },
+      },
+    },
   ],
 
   economy: [
@@ -306,6 +329,28 @@ const TOOL_DEFINITIONS = {
         required: ['targetFactionId'],
       },
     },
+    {
+      name: 'grant_military_access',
+      description: 'Grant military access to an ally. Their troops can pass through your territory during auto-deploy. Mutual (they can also enter yours). Auto-revoked on war.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          factionId: { type: 'string', description: 'Ally faction to grant access to' },
+        },
+        required: ['factionId'],
+      },
+    },
+    {
+      name: 'revoke_military_access',
+      description: 'Revoke military access from an ally. Their pending movement orders through your territory will be cancelled.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          factionId: { type: 'string', description: 'Faction to revoke access from' },
+        },
+        required: ['factionId'],
+      },
+    },
   ],
 
   espionage: [
@@ -386,13 +431,24 @@ const TOOL_DEFINITIONS = {
     },
     {
       name: 'submit_chat_quote',
-      description: 'Submit a chat quote for your faction. When the game auto-triggers a chat (war declaration, victory gloat, alliance offer, etc.), your quote will be used instead of the built-in template. The system prefixes it as: "[Faction] [ACT] [Target]: \\"[your quote]\\"".',
+      description: 'Fill quote for auto-game chat. When the game auto-triggers a chat, your custom quote replaces the template.',
       inputSchema: {
         type: 'object',
         properties: {
-          quote: { type: 'string', description: 'Your custom chat message (used as the quote after the colon). Max 500 chars.' },
+          quote: { type: 'string', description: 'Your custom quote (max 500 chars). Will be used for the next auto-triggered chat event.' },
         },
         required: ['quote'],
+      },
+    },
+    {
+      name: 'send_broadcast',
+      description: 'Send a global broadcast message visible to ALL factions. Use for propaganda, inciting war, calling out enemies, or shitposting. Shows up in every faction\'s notifications.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: 'Your global message (max 1000 chars). Seen by everyone.' },
+        },
+        required: ['message'],
       },
     },
   ],

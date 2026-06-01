@@ -266,4 +266,32 @@ const REGIONS = [
   { id: 'md_moldova', name: 'Moldova', country: 'moldova', lat: 47.0, lng: 28.0, resources: 20, population: 180, neighbors: ['md_chisinau', 'ro_moldova', 'ua_vinnytsia', 'ua_bucovina', 'ua_odesa'] },
 ];
 
-module.exports = { REGIONS };
+// Sea zones — connect coastal regions across water.
+// Troops can cross via sea zones if faction has navy > 0.
+const SEA_ZONES = [
+  { id: 'sea_english_channel', name: 'English Channel', neighbors: ['uk_south_east', 'uk_south_west', 'fr_normandy', 'fr_hauts_france', 'be_flanders', 'nl_holland'] },
+  { id: 'sea_north_sea', name: 'North Sea', neighbors: ['uk_east_england', 'uk_scotland', 'nl_holland', 'nl_groningen', 'de_niedersachsen', 'de_schleswig', 'dk_jutland', 'no_sorlandet', 'no_oslo'] },
+  { id: 'sea_baltic', name: 'Baltic Sea', neighbors: ['de_schleswig', 'de_mecklenburg', 'pl_pomerania', 'ru_kaliningrad', 'lt_samogitia', 'lv_latvia', 'ee_tallinn', 'fi_helsinki', 'se_uppsala', 'se_stockholm', 'se_skane', 'dk_sjaelland', 'dk_copenhagen'] },
+  { id: 'sea_mediterranean_western', name: 'Western Mediterranean', neighbors: ['es_catalonia', 'es_valencia', 'es_andalusia', 'fr_provence', 'it_liguria', 'it_sardinia', 'it_sicily'] },
+  { id: 'sea_mediterranean_central', name: 'Central Mediterranean', neighbors: ['it_sicily', 'it_calabria', 'it_sardinia', 'gr_crete', 'gr_peloponnese', 'gr_athens'] },
+  { id: 'sea_adriatic', name: 'Adriatic Sea', neighbors: ['it_veneto', 'it_friuli', 'si_slovenia', 'hr_croatia', 'it_marche', 'it_abruzzo', 'it_molise', 'it_puglia', 'al_albania', 'me_montenegro'] },
+  { id: 'sea_aegean', name: 'Aegean Sea', neighbors: ['gr_athens', 'gr_central', 'gr_eastern_macedonia', 'tr_eastern_thrace'] },
+  { id: 'sea_black_sea', name: 'Black Sea', neighbors: ['ro_dobrogea', 'bg_northern', 'bg_southern', 'tr_eastern_thrace', 'ua_odesa', 'ua_crimea', 'ru_rostov', 'ru_kuban'] },
+  { id: 'sea_irish', name: 'Irish Sea', neighbors: ['uk_northern_ireland', 'uk_scotland', 'uk_wales', 'uk_south_west', 'ie_leinster', 'ie_dublin', 'ie_connacht', 'ie_munster'] },
+];
+
+// Build lookup: region id -> sea zones that connect it
+function buildSeaConnections() {
+  const map = {};
+  for (const sz of SEA_ZONES) {
+    for (const n of sz.neighbors) {
+      if (!map[n]) map[n] = [];
+      map[n].push(sz.id);
+    }
+  }
+  return map;
+}
+
+const SEA_CONNECTIONS = buildSeaConnections();
+
+module.exports = { REGIONS, SEA_ZONES, SEA_CONNECTIONS };

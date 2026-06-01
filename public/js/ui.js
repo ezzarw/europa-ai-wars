@@ -1,5 +1,5 @@
-let renderedEventCount = 0;
-let renderedChatCount = 0;
+let lastEventKey = null;
+let lastChatKey = null;
 let lastFactionHash = '';
 
 function hashFactions(state) {
@@ -70,15 +70,23 @@ function updateFactionList(state) {
 function appendEvents(state) {
   const log = document.getElementById('eventLog');
   const events = state.events || [];
+  if (events.length === 0) return;
 
-  if (events.length > renderedEventCount) {
-    const newEvents = events.slice(renderedEventCount);
-    for (const event of newEvents) {
-      const type = event.type || 'info';
-      const message = event.message || '';
-      log.insertAdjacentHTML('beforeend', `<div class="event-entry ${type}">${message}</div>`);
+  const lastKey = events[events.length - 1].message + '|' + events[events.length - 1].type;
+
+  if (lastEventKey === null) {
+    log.innerHTML = events.map(e => `<div class="event-entry ${e.type || 'info'}">${e.message || ''}</div>`).join('');
+    lastEventKey = lastKey;
+  } else if (lastKey !== lastEventKey) {
+    const oldIdx = events.findIndex(e => e.message + '|' + e.type === lastEventKey);
+    if (oldIdx >= 0) {
+      for (let i = oldIdx + 1; i < events.length; i++) {
+        log.insertAdjacentHTML('beforeend', `<div class="event-entry ${events[i].type || 'info'}">${events[i].message || ''}</div>`);
+      }
+    } else {
+      log.innerHTML = events.map(e => `<div class="event-entry ${e.type || 'info'}">${e.message || ''}</div>`).join('');
     }
-    renderedEventCount = events.length;
+    lastEventKey = lastKey;
   }
 
   log.scrollTop = log.scrollHeight;
@@ -87,22 +95,52 @@ function appendEvents(state) {
 function appendChats(state) {
   const log = document.getElementById('chatLog');
   const msgs = state.recentChat || [];
+  if (msgs.length === 0) return;
 
-  if (msgs.length > renderedChatCount) {
-    const newMsgs = msgs.slice(renderedChatCount);
-    for (const msg of newMsgs) {
+  const lastMsg = msgs[msgs.length - 1];
+  const lastKey = lastMsg.text + '|' + lastMsg.type + '|' + lastMsg.sender + '|' + (lastMsg.receiver || '');
+
+  if (lastChatKey === null) {
+    log.innerHTML = msgs.map(msg => {
       const senderName = lastState?.factions?.find(f => f.id === msg.sender)?.flag || msg.sender;
       const receiverName = lastState?.factions?.find(f => f.id === msg.receiver)?.flag || msg.receiver;
-      log.insertAdjacentHTML('beforeend', `
-        <div class="chat-entry chat-type-${msg.type || 'chat'}">
+      return `<div class="chat-entry chat-type-${msg.type || 'chat'}">
+        <span class="chat-sender">${senderName}</span>
+        <span style="color:#666;">→</span>
+        <span>${receiverName}</span>
+        <div style="color:#aaa;font-size:9px;padding-left:2px;">${escapeHtml(msg.text || '')}</div>
+      </div>`;
+    }).join('');
+    lastChatKey = lastKey;
+  } else if (lastKey !== lastChatKey) {
+    const oldIdx = msgs.findIndex(m => m.text + '|' + m.type + '|' + m.sender + '|' + (m.receiver || '') === lastChatKey);
+    if (oldIdx >= 0) {
+      for (let i = oldIdx + 1; i < msgs.length; i++) {
+        const msg = msgs[i];
+        const senderName = lastState?.factions?.find(f => f.id === msg.sender)?.flag || msg.sender;
+        const receiverName = lastState?.factions?.find(f => f.id === msg.receiver)?.flag || msg.receiver;
+        log.insertAdjacentHTML('beforeend', `
+          <div class="chat-entry chat-type-${msg.type || 'chat'}">
+            <span class="chat-sender">${senderName}</span>
+            <span style="color:#666;">→</span>
+            <span>${receiverName}</span>
+            <div style="color:#aaa;font-size:9px;padding-left:2px;">${escapeHtml(msg.text || '')}</div>
+          </div>
+        `);
+      }
+    } else {
+      log.innerHTML = msgs.map(msg => {
+        const senderName = lastState?.factions?.find(f => f.id === msg.sender)?.flag || msg.sender;
+        const receiverName = lastState?.factions?.find(f => f.id === msg.receiver)?.flag || msg.receiver;
+        return `<div class="chat-entry chat-type-${msg.type || 'chat'}">
           <span class="chat-sender">${senderName}</span>
           <span style="color:#666;">→</span>
           <span>${receiverName}</span>
           <div style="color:#aaa;font-size:9px;padding-left:2px;">${escapeHtml(msg.text || '')}</div>
-        </div>
-      `);
+        </div>`;
+      }).join('');
     }
-    renderedChatCount = msgs.length;
+    lastChatKey = lastKey;
   }
 
   log.scrollTop = log.scrollHeight;

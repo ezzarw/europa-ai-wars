@@ -62,6 +62,13 @@ const cfg = {
   TRADE_PRICE_BASE: parseFloat(process.env.TRADE_PRICE_BASE) || 5,
   TRADE_TRUST_GAIN: parseFloat(process.env.TRADE_TRUST_GAIN) || 0.02,
   TAX_RATE_DEFAULT: parseFloat(process.env.TAX_RATE_DEFAULT) || 0.3,
+
+  // Navy / Sea Crossing
+  NAVY_COST_PER_CROSSING: parseFloat(process.env.NAVY_COST_PER_CROSSING) || 1,
+  TROOPS_PER_NAVY: parseInt(process.env.TROOPS_PER_NAVY, 10) || 100,
+
+  // Movement Queue
+  TROOP_TRANSFER_SPEED: parseInt(process.env.TROOP_TRANSFER_SPEED, 10) || 50,
 };
 
 module.exports = cfg;

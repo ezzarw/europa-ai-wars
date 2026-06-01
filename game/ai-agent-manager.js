@@ -1,3 +1,5 @@
+const { SEA_CONNECTIONS } = require('./map');
+
 const TOOL_WEIGHTS = {
   get_world_state: 20, get_faction_info: 15, get_region_info: 10,
   get_military_intel: 15, get_diplomatic_overview: 10, get_events_feed: 8,
@@ -88,10 +90,15 @@ class AIAgentManager {
       if (roll < 0.35) {
         const enemy = enemies[Math.floor(Math.random() * enemies.length)];
         const er = this.gc.engine.regions.filter(r => r.owner === enemy.id);
-        const targets = this.gc.engine.regions.filter(r =>
-          r.owner === faction.id &&
-          r.neighbors.some(n => er.some(x => x.id === n))
-        );
+        const targets = this.gc.engine.regions.filter(r => {
+          if (r.owner !== faction.id) return false;
+          if (r.neighbors.some(n => er.some(x => x.id === n))) return true;
+          // Sea connection — can attack across water if we have navy
+          if ((SEA_CONNECTIONS[r.id] || []).some(sz => er.some(x => (SEA_CONNECTIONS[x.id] || []).includes(sz)))) {
+            return faction.military.navy >= 5;
+          }
+          return false;
+        });
         if (targets.length > 0 && er.length > 0) {
           const from = targets[Math.floor(Math.random() * targets.length)];
           const to = er[Math.floor(Math.random() * er.length)];

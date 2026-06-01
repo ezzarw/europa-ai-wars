@@ -33,6 +33,9 @@ app.post('/mcp', (req, res) => {
   }
   const result = handleMcpRequest(request, gameController);
   res.json(result);
+  if (request.method && !request.method.startsWith('get_')) {
+    io.emit('game_state', game.getFullState());
+  }
 });
 
 app.get('/mcp', (req, res) => {

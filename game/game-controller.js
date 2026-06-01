@@ -1,4 +1,4 @@
-const { REGIONS } = require('./map');
+const { REGIONS, SEA_CONNECTIONS } = require('./map');
 const { createFactions, FACTIONS_CONFIG } = require('./factions');
 const { resolveBattle } = require('./battle');
 const { updateRelations, setEmotion } = require('./diplomacy');
@@ -148,6 +148,30 @@ class GameController {
     return { success: true };
   }
 
+  areRegionsConnected(fromId, toId, faction) {
+    const from = this.engine.regions.find(r => r.id === fromId);
+    if (!from) return { connected: false };
+
+    // 1. Direct land neighbor
+    if (from.neighbors.includes(toId)) return { connected: true };
+
+    // 2. Sea connection — both regions must share a sea zone, faction needs navy
+    const fromSeas = SEA_CONNECTIONS[fromId];
+    const toSeas = SEA_CONNECTIONS[toId];
+    if (fromSeas && toSeas) {
+      const sharedSea = fromSeas.find(sz => toSeas.includes(sz));
+      if (sharedSea) {
+        if (!faction) return { connected: true, viaSea: true };
+        if ((faction.military.navy || 0) <= 0) {
+          return { connected: false, error: `No navy available. Need at least 1 navy to cross ${sharedSea.replace('sea_', '').replace(/_/g, ' ')}.` };
+        }
+        return { connected: true, viaSea: true, seaZone: sharedSea };
+      }
+    }
+
+    return { connected: false };
+  }
+
   getJoinableFactions() {
     const takenIds = new Set(Object.values(this.agents).filter(a => a.connected).map(a => a.factionId));
     return Object.values(this.engine.factions)
@@ -185,6 +209,19 @@ class GameController {
     try {
       const result = handler.call(this, agent, faction, args);
       this.actionLog.push({ agentId, toolName, args, timestamp: Date.now(), result: 'success' });
+
+      // Auto-attach notifications & broadcasts to every response
+      if (result && typeof result === 'object' && !result.error) {
+        const notifs = this.engine.notifications.getUnreadNotifications(agent.factionId);
+        const broadcasts = this.engine.chat.getBroadcasts(10);
+        if (notifs.length > 0 || broadcasts.length > 0) {
+          result._notifications = notifs.map(n => ({ type: n.type, message: n.message, timestamp: n.timestamp }));
+          result._broadcasts = broadcasts.map(b => ({ sender: b.sender, text: b.text, timestamp: b.timestamp }));
+          // Mark notifications as read
+          for (const n of notifs) n.read = true;
+        }
+      }
+
       return result;
     } catch (err) {
       this.actionLog.push({ agentId, toolName, args, timestamp: Date.now(), result: 'error', error: err.message });
@@ -216,6 +253,7 @@ class GameController {
       impose_sanctions: (agent, faction, args) => this.cmdSanctions(agent, faction, args),
       send_message: (agent, faction, args) => this.cmdSendMessage(agent, faction, args),
       submit_chat_quote: (agent, faction, args) => this.cmdSubmitChatQuote(agent, faction, args),
+      send_broadcast: (agent, faction, args) => this.cmdSendBroadcast(agent, faction, args),
       propose_alliance: (agent, faction, args) => this.cmdProposeAlliance(agent, faction, args),
       respond_alliance: (agent, faction, args) => this.cmdRespondAlliance(agent, faction, args),
       break_alliance: (agent, faction, args) => this.cmdBreakAlliance(agent, faction, args),
@@ -234,6 +272,10 @@ class GameController {
       request_recognition: (agent, faction, args) => this.cmdRequestRecognition(agent, faction, args),
       develop_nuclear: (agent, faction, args) => this.cmdNuclearProgram(agent, faction, args),
       launch_nuke: (agent, faction, args) => this.cmdLaunchNuke(agent, faction, args),
+      deploy_troops: (agent, faction, args) => this.cmdDeployTroops(agent, faction, args),
+      get_movement_orders: (agent, faction, args) => this.cmdGetMovementOrders(agent, faction, args),
+      grant_military_access: (agent, faction, args) => this.cmdGrantAccess(agent, faction, args),
+      revoke_military_access: (agent, faction, args) => this.cmdRevokeAccess(agent, faction, args),
     };
   }
 
@@ -419,15 +461,39 @@ class GameController {
     if (targetRegion.owner === faction.id) return { error: 'Cannot attack your own region' };
     const defenderId = targetRegion.owner;
 
+    // Land neighbors
     const friendlyNeighbors = this.engine.regions.filter(r =>
       r.owner === faction.id && r.neighbors.includes(targetRegion.id)
     );
-    if (friendlyNeighbors.length === 0) return { error: 'No neighboring region to attack from' };
+
+    // Sea neighbors — coastal regions that share a sea zone with target
+    const friendlySeaNeighbors = (SEA_CONNECTIONS[targetRegion.id] || []).length > 0
+      ? this.engine.regions.filter(r =>
+          r.owner === faction.id && (SEA_CONNECTIONS[r.id] || []).some(sz =>
+            (SEA_CONNECTIONS[targetRegion.id] || []).includes(sz)
+          ) && !friendlyNeighbors.includes(r)
+        )
+      : [];
+
+    if (friendlyNeighbors.length === 0 && friendlySeaNeighbors.length === 0) {
+      return { error: 'No neighboring region to attack from. Need to share a land border or a sea zone (requires navy).' };
+    }
+
+    const isSeaAttack = friendlyNeighbors.length === 0 && friendlySeaNeighbors.length > 0;
 
     const fromRegion = args.fromRegionId
       ? this.engine.regions.find(r => r.id === args.fromRegionId || r.name.toLowerCase() === args.fromRegionId?.toLowerCase())
-      : friendlyNeighbors[0];
+      : (friendlyNeighbors[0] || friendlySeaNeighbors[0]);
     if (!fromRegion || fromRegion.owner !== faction.id) return { error: 'Invalid staging region' };
+
+    // Validate sea attack requirements
+    if (isSeaAttack || (friendlyNeighbors.length === 0 && friendlySeaNeighbors.some(r => r.id === fromRegion.id))) {
+      const viaSea = true;
+      if ((faction.military.navy || 0) <= 0) {
+        return { error: 'No navy available. Need at least 1 navy to launch an amphibious assault.' };
+      }
+      args._viaSea = true;
+    }
 
     const availableTroops = fromRegion.troops || 0;
     const committedTroops = Math.min(Math.max(1, Math.floor(args.troops || availableTroops)), availableTroops);
@@ -552,6 +618,17 @@ class GameController {
       };
     }
 
+    // Consume navy for amphibious assault
+    if (args._viaSea) {
+      const navyUsed = Math.max(1, Math.floor(committedTroops / cfg.TROOPS_PER_NAVY));
+      faction.military.navy = Math.max(0, (faction.military.navy || 0) - navyUsed);
+      if (result && typeof result === 'object') {
+        result.navyUsed = navyUsed;
+        result.navyRemaining = faction.military.navy;
+        result.amphibious = true;
+      }
+    }
+
     if (!faction.relations[defenderId]?.war && targetFaction?.alive) {
       faction.relations[defenderId].war = true;
       targetFaction.relations[faction.id].war = true;
@@ -582,19 +659,37 @@ class GameController {
     const to = this.engine.regions.find(r => r.id === args.toRegionId || r.name.toLowerCase() === args.toRegionId?.toLowerCase());
     if (!from || !to) return { error: 'Region not found' };
     if (from.owner !== faction.id || to.owner !== faction.id) return { error: 'Both regions must be owned by you' };
-    if (!from.neighbors.includes(to.id)) return { error: 'Regions are not connected' };
+
+    const conn = this.areRegionsConnected(from.id, to.id, faction);
+    if (!conn.connected) {
+      const fromSeas = SEA_CONNECTIONS[from.id];
+      const toSeas = SEA_CONNECTIONS[to.id];
+      if (fromSeas && toSeas && fromSeas.some(sz => toSeas.includes(sz)) && (faction.military.navy || 0) <= 0) {
+        return { error: conn.error || 'No navy available for sea crossing. Build navy first.' };
+      }
+      return { error: conn.error || 'Regions are not connected' };
+    }
 
     const count = Math.min(Math.max(1, Math.floor(args.count || from.troops || 0)), from.troops || 0);
     if (count <= 0) return { error: `No troops available in ${from.name}` };
+
+    // Navy cost for sea crossing
+    if (conn.viaSea) {
+      const navyNeeded = Math.max(1, Math.ceil(count / cfg.TROOPS_PER_NAVY));
+      if ((faction.military.navy || 0) < navyNeeded) {
+        return { error: `Not enough navy. Need ${navyNeeded} navy to move ${count} troops across sea, have ${faction.military.navy || 0}.` };
+      }
+      faction.military.navy -= navyNeeded;
+    }
 
     from.troops = Math.max(0, (from.troops || 0) - count);
     to.troops = (to.troops || 0) + count;
     this.engine.eventLog.push(this.tacticalLineEvent(
       'troop_movement',
-      `↗ ${faction.name} redeploys ${count} troops from ${from.name} to ${to.name}.`,
+      `↗ ${faction.name} redeploys ${count} troops from ${from.name} to ${to.name}${conn.viaSea ? ' by sea' : ''}.`,
       from,
       to,
-      { lineType: 'movement', troops: count, faction: faction.id }
+      { lineType: 'movement', troops: count, faction: faction.id, sea: !!conn.viaSea }
     ));
     return {
       success: true,
@@ -604,6 +699,8 @@ class GameController {
       fromTroops: from.troops,
       toTroops: to.troops,
       totalArmy: faction.military.army,
+      navyRemaining: faction.military.navy,
+      viaSea: !!conn.viaSea,
     };
   }
 
@@ -719,6 +816,31 @@ class GameController {
     return { success: true, stored: true, quote };
   }
 
+  cmdSendBroadcast(agent, faction, args) {
+    const text = (args.message || '').trim();
+    if (!text) return { error: 'Message cannot be empty' };
+    if (text.length > 1000) return { error: 'Message too long (max 1000 chars)' };
+
+    const msg = this.engine.chat.sendBroadcast(faction.id, text);
+    const formatted = `📢 [${faction.name}] ${text}`;
+
+    this.engine.eventLog.push({
+      type: 'broadcast',
+      message: formatted,
+      sender: faction.id,
+      broadcast: true,
+    });
+
+    // Notify all alive factions
+    for (const f of Object.values(this.engine.factions)) {
+      if (f.alive && f.id !== faction.id) {
+        this.engine.notifications.addNotification(f.id, 'broadcast', formatted);
+      }
+    }
+
+    return { success: true, broadcast: text, global: true };
+  }
+
   cmdProposeAlliance(agent, faction, args) {
     const target = this.engine.factions[args.targetFactionId];
     if (!target || !target.alive) return { error: 'Target faction not found' };
@@ -784,6 +906,11 @@ class GameController {
     faction.relations[target.id].war = true;
     target.relations[faction.id].war = true;
     if (faction.relations[target.id]?.alliance) faction.relations[target.id].alliance = false;
+
+    // Auto-revoke military access on war declaration
+    faction.relations[target.id].militaryAccess = false;
+    target.relations[faction.id].militaryAccess = false;
+    this.engine.movementQueue.withdrawRemaining(faction.id);
 
     setEmotion(faction, target.id, 'hatred', 70);
     setEmotion(target, faction.id, 'hatred', 60);
@@ -1114,6 +1241,117 @@ class GameController {
     if (this.actionLog.length > 500) {
       this.actionLog = this.actionLog.slice(-400);
     }
+  }
+
+  cmdDeployTroops(agent, faction, args) {
+    const fromRegions = Array.isArray(args.fromRegions) ? args.fromRegions : [args.fromRegionId || args.fromRegions];
+    const toRegions = Array.isArray(args.toRegions) ? args.toRegions : [args.toRegionId || args.toRegions];
+    const totalCount = args.count || args.amount;
+
+    if (!fromRegions.length || !toRegions.length) return { error: 'Need fromRegions and toRegions' };
+
+    const fromList = fromRegions.map(r => this.engine.regions.find(x => x.id === r || x.name.toLowerCase() === r?.toLowerCase())).filter(Boolean);
+    const toList = toRegions.map(r => this.engine.regions.find(x => x.id === r || x.name.toLowerCase() === r?.toLowerCase())).filter(Boolean);
+
+    if (!fromList.length) return { error: 'No valid source regions found' };
+    if (!toList.length) return { error: 'No valid target regions found' };
+    if (fromList.some(r => r.owner !== faction.id)) return { error: 'All source regions must be owned by you' };
+
+    const available = fromList.reduce((sum, r) => sum + (r.troops || 0), 0);
+    const totalToMove = totalCount ? Math.min(totalCount, available) : available;
+    if (totalToMove <= 0) return { error: 'No troops available in source regions' };
+
+    const perTarget = Math.floor(totalToMove / toList.length);
+    if (perTarget <= 0) return { error: `Too few troops per target (${perTarget}). Reduce target count or increase troops.` };
+
+    let orders = [];
+    let remaining = totalToMove;
+    let totalDeployed = 0;
+
+    for (const to of toList) {
+      const amt = to === toList[toList.length - 1] ? remaining : perTarget;
+      if (amt <= 0) break;
+
+      let need = amt;
+      for (const from of fromList) {
+        if (need <= 0) break;
+        const take = Math.min(need, from.troops || 0);
+        if (take <= 0) continue;
+
+        const result = this.engine.movementQueue.addOrder(faction.id, from.id, to.id, take);
+        if (result.error) continue;
+
+        orders.push({ ...result, amount: take, from: from.id, to: to.id });
+        totalDeployed += take;
+        need -= take;
+        remaining -= take;
+      }
+    }
+
+    return {
+      success: totalDeployed > 0,
+      deployed: totalDeployed,
+      orders,
+      from: fromList.map(r => r.name),
+      to: toList.map(r => r.name),
+      pathCount: orders.length,
+      note: 'Troops will move automatically each turn via the shortest path.',
+    };
+  }
+
+  cmdGetMovementOrders(agent, faction, args) {
+    const mq = this.engine.movementQueue;
+    if (args?.orderId) {
+      const order = mq.orders.find(o => o.id === args.orderId && o.factionId === faction.id);
+      return order ? { order } : { error: 'Order not found' };
+    }
+    return { orders: mq.getOrders(faction.id) };
+  }
+
+  cmdGrantAccess(agent, faction, args) {
+    const target = this.engine.factions[args.factionId];
+    if (!target || !target.alive) return { error: 'Target faction not found' };
+    if (target.id === faction.id) return { error: 'Cannot grant access to yourself' };
+
+    const rel = faction.relations[target.id];
+    if (!rel) return { error: 'No relation with this faction' };
+    if (rel.war) return { error: 'Cannot grant military access while at war' };
+    if (!rel.alliance) return { error: 'Must be allied to grant military access' };
+
+    rel.militaryAccess = true;
+    target.relations[faction.id].militaryAccess = true;
+
+    this.engine.eventLog.push({
+      type: 'military_access',
+      message: `🪖 ${faction.name} grants military access to ${target.name}.`,
+      grantor: faction.id,
+      grantee: target.id,
+      mutual: true,
+    });
+
+    return { success: true, faction: target.name, granted: true, mutual: true };
+  }
+
+  cmdRevokeAccess(agent, faction, args) {
+    const target = this.engine.factions[args.factionId];
+    if (!target || !target.alive) return { error: 'Target faction not found' };
+
+    const rel = faction.relations[target.id];
+    if (!rel || !rel.militaryAccess) return { error: 'No military access to revoke' };
+
+    rel.militaryAccess = false;
+    target.relations[faction.id].militaryAccess = false;
+
+    this.engine.movementQueue.withdrawRemaining(faction.id);
+
+    this.engine.eventLog.push({
+      type: 'military_access_revoked',
+      message: `🚫 ${faction.name} revokes military access from ${target.name}.`,
+      grantor: faction.id,
+      grantee: target.id,
+    });
+
+    return { success: true, faction: target.name, revoked: true };
   }
 }
 

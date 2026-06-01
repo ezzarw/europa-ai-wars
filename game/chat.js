@@ -84,6 +84,24 @@ class ChatSystem {
   constructor() {
     this.messages = [];
     this.conversations = {};
+    this.broadcasts = []; // Global broadcast messages
+  }
+
+  sendBroadcast(senderId, text, type = 'broadcast') {
+    const msg = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      sender: senderId,
+      receiver: '_all',
+      text,
+      type,
+      timestamp: Date.now(),
+    };
+    this.broadcasts.push(msg);
+    return msg;
+  }
+
+  getBroadcasts(limit = 20) {
+    return this.broadcasts.slice(-limit);
   }
 
   sendMessage(senderId, receiverId, text, type = 'chat') {

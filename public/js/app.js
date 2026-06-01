@@ -20,12 +20,6 @@ socket.on('game_started', (data) => {
   showNotification('🌍 WW3 BEGINS! The AI war for Europe starts now!', 'alliance');
 });
 
-setInterval(() => {
-  if (lastState) {
-    socket.emit('request_state');
-  }
-}, 5000);
-
 document.addEventListener('keydown', (e) => {
   if (e.key === 'n' || e.key === 'N') {
     toggleNotificationPanel();

@@ -6,6 +6,7 @@ const { getRandomEvent } = require('./events');
 const { getDoctrineBonuses } = require('./doctrines');
 const { NotificationSystem } = require('./notifications');
 const { ChatSystem } = require('./chat');
+const { MovementQueue } = require('./movement-queue');
 const cfg = require('./config');
 
 class GameEngine {
@@ -23,6 +24,7 @@ class GameEngine {
     this.speed = cfg.GAME_SPEED_MS;
     this.notifications = new NotificationSystem();
     this.chat = new ChatSystem();
+    this.movementQueue = new MovementQueue(this);
     this.initializeRegionTroops();
   }
 
@@ -37,6 +39,7 @@ class GameEngine {
     this.events = [];
     this.notifications = new NotificationSystem();
     this.chat = new ChatSystem();
+    this.movementQueue = new MovementQueue(this);
     this.initializeRelations();
     this.initializeRegionTroops();
   }
@@ -167,6 +170,7 @@ class GameEngine {
     this.processEconomy();
     this.processMilitaryProduction();
     this.reconcileRegionTroops();
+    this.movementQueue.processTick();
     this.checkFactionDestruction(turnEvents);
     this.processNotifications(turnEvents);
 
@@ -547,9 +551,11 @@ class GameEngine {
         id: f.id, name: f.name, flag: f.flag,
       })),
       events: this.eventLog.slice(-50),
+      eventLogCount: this.eventLog.length,
       statsHistory: this.statsHistory.slice(-100),
       factionDestroyedLog: this.factionDestroyedLog,
       recentChat: this.chat.messages.slice(-20),
+      chatCount: this.chat.messages.length,
       globalNotifications: this.notifications.getRecentGlobal().slice(-20),
     };
   }

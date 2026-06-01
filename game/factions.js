@@ -790,7 +790,7 @@ function createFactions() {
     for (const f2 of Object.values(factions)) {
       if (f1.id !== f2.id) {
         const baseTrust = 0.3 + Math.random() * 0.4;
-        f1.relations[f2.id] = { trust: baseTrust, opinion: Math.random() * 100, alliance: false, war: false, traded: 0 };
+        f1.relations[f2.id] = { trust: baseTrust, opinion: Math.random() * 100, alliance: false, war: false, traded: 0, militaryAccess: false };
         f1.emotions[f2.id] = {
           dominant: 'neutral',
           joy: 0, anger: 0, sadness: 0, fear: 0,
